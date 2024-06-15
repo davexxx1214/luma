@@ -149,7 +149,7 @@ class lumaplayer(Plugin):
         except Exception as e:
             logger.error("call luma api error: {}".format(e))
             rt = ReplyType.TEXT
-            rc = "服务暂不可用"
+            rc = f"服务暂不可用: {e}"
             reply = Reply(rt, rc)
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
