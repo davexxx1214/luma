@@ -83,7 +83,7 @@ class lumaplayer(Plugin):
                     self.params_cache[user_id]['luma_quota'] = 1
                     tip = f"💡已经开启图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{prompt}"
                 else:
-                    tip = f"💡欢迎使用图片生成视频服务，指令格式为:\n\n{self.luma_prefix} + 对视频的描述"
+                    tip = f"💡欢迎使用图片生成视频服务，指令格式为:\n\n{self.luma_prefix} + 对视频的描述(英文更佳)\n例如：{self.luma_prefix}  a cute cat is dancing"
 
                 reply = Reply(type=ReplyType.TEXT, content= tip)
                 e_context["reply"] = reply
@@ -144,7 +144,16 @@ class lumaplayer(Plugin):
         tip = '欢迎光临神奇的视频制造厂！🎥✨ 放松，倒一杯咖啡☕️，伸个懒腰🧘‍♂️。让我们的小精灵们为你打造专属视频。稍坐片刻，2-5分钟后，您的视频即将呈现！🎬✨'
         self.send_reply(tip, e_context)
 
-        i.save_video(prompt, output_dir)
+        try:
+            i.save_video(prompt, output_dir)
+        except Exception as e:
+            logger.error("call luma api error: {}".format(e))
+            rt = ReplyType.TEXT
+            rc = "服务暂不可用"
+            reply = Reply(rt, rc)
+            e_context["reply"] = reply
+            e_context.action = EventAction.BREAK_PASS
+            return
         
         # 查找 output_dir 中的 mp3 和 mp4 文件
         mp4_files = glob(os.path.join(output_dir, '*.mp4'))
