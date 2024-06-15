@@ -7,6 +7,8 @@ from channel.chat_message import ChatMessage
 from plugins import *
 from common.log import logger
 from common.tmp_dir import TmpDir
+from common.expired_dict import ExpiredDict
+
 
 import os
 from luma import VideoGen
@@ -45,6 +47,7 @@ class lumaplayer(Plugin):
             # 从配置中提取所需的设置
             self.cookie = self.config.get("cookie","")
             self.luma_prefix = self.config.get("luma_prefix", "luma")
+            self.params_cache = ExpiredDict(500)
 
             # 初始化成功日志
             logger.info("[lumaplayer] inited.")
