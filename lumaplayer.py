@@ -126,8 +126,17 @@ class lumaplayer(Plugin):
         logger.info(f"call_luma_service")
 
         prompt = self.params_cache[user_id]['prompt']
-        
-        i = VideoGen(self.cookie, image_path ) # Replace 'cookie', image_url with your own
+        try:
+            i = VideoGen(self.cookie, image_path ) # Replace 'cookie', image_url with your own
+        except Exception as e:
+                    logger.error("call luma api error: {}".format(e))
+                    rt = ReplyType.TEXT
+                    rc = f"服务不可用，请联系管理员: {e}"
+                    reply = Reply(rt, rc)
+                    e_context["reply"] = reply
+                    e_context.action = EventAction.BREAK_PASS
+                    return        
+
         logger.info(f"credit left =  {i.get_limit_left()} ")
         if i.get_limit_left() < 1:
             logger.info("No enough credit left.")
