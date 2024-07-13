@@ -97,7 +97,7 @@ class lumaplayer(Plugin):
                     self.params_cache[user_id]['text_prompt'] = text_prompt
                     self.call_kling_service(None, user_id, e_context)
                 else:
-                    tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_img_prefix} + 对视频的描述\n例如：{self.kling_img_prefix} make the picture alive."
+                    tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_text_prefix} + 对视频的描述\n例如：{self.kling_text_prefix} a girl is walking in the street."
 
                 reply = Reply(type=ReplyType.TEXT, content= tip)
                 e_context["reply"] = reply
