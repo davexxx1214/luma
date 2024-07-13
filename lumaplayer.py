@@ -11,7 +11,7 @@ from common.expired_dict import ExpiredDict
 
 
 import os
-from kling import ImageGen, VideoGen
+from kling import VideoGen
 import os
 import uuid
 from glob import glob
@@ -69,6 +69,7 @@ class lumaplayer(Plugin):
             self.params_cache[user_id] = {}
             self.params_cache[user_id]['kling_img_quota'] = 0
             self.params_cache[user_id]['img_prompt'] = None
+            self.params_cache[user_id]['text_prompt'] = None
 
             logger.debug('Added new user to params_cache. user id = ' + user_id)
 
@@ -77,14 +78,26 @@ class lumaplayer(Plugin):
                 pattern = self.kling_img_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
                 if match: ##   匹配上了kling的指令
-                    query = content[len(self.kling_img_prefix):].strip()
-                    prompt = self.translate_to_english(query)
-                    logger.info(f"translate kling prompt to : {prompt}")
-                    self.params_cache[user_id]['img_prompt'] = prompt
+                    img_prompt = content[len(self.kling_img_prefix):].strip()
+                    self.params_cache[user_id]['img_prompt'] = img_prompt
                     self.params_cache[user_id]['kling_img_quota'] = 1
-                    tip = f"💡已经开启kling图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{prompt}"
+                    tip = f"💡已经开启kling图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{img_prompt}"
                 else:
                     tip = f"💡欢迎使用kling图片生成视频服务，指令格式为:\n\n{self.kling_img_prefix} + 对视频的描述\n例如：{self.kling_img_prefix} make the picture alive."
+
+                reply = Reply(type=ReplyType.TEXT, content= tip)
+                e_context["reply"] = reply
+                e_context.action = EventAction.BREAK_PASS
+
+            elif content.startswith(self.kling_text_prefix):
+                pattern = self.kling_text_prefix + r"\s(.+)"
+                match = re.match(pattern, content)
+                if match: ##   匹配上了kling的指令
+                    text_prompt = content[len(self.kling_text_prefix):].strip()
+                    self.params_cache[user_id]['text_prompt'] = text_prompt
+                    self.call_kling_service(None, user_id, e_context)
+                else:
+                    tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_img_prefix} + 对视频的描述\n例如：{self.kling_img_prefix} make the picture alive."
 
                 reply = Reply(type=ReplyType.TEXT, content= tip)
                 e_context["reply"] = reply
@@ -124,9 +137,13 @@ class lumaplayer(Plugin):
         return os.path.exists(file_path) and os.path.getsize(file_path) > min_size
 
     def call_kling_service(self, image_path, user_id, e_context):
-        logger.info(f"call_kling_service")
+        logger.info("call_kling_service")
 
-        img_prompt = self.params_cache[user_id]['img_prompt'] 
+        if image_path:
+            prompt = self.params_cache[user_id]['img_prompt']
+        else:
+            prompt = self.params_cache[user_id]['text_prompt']
+
         output_dir = self.generate_unique_output_directory(TmpDir().path())
         logger.info(f"output dir = {output_dir}")
 
@@ -135,7 +152,10 @@ class lumaplayer(Plugin):
 
         try:
             v = VideoGen(self.cookie)  # Replace 'cookie', image_url with your own
-            v.save_video(img_prompt, output_dir, image_path)
+            if not image_path:
+                v.save_video(prompt, output_dir)
+            else:
+                v.save_video(prompt, output_dir, image_path)
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
@@ -144,6 +164,7 @@ class lumaplayer(Plugin):
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
             return
+
         
         # 查找 output_dir 中的 mp3 和 mp4 文件
         mp4_files = glob(os.path.join(output_dir, '*.mp4'))
