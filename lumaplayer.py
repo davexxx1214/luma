@@ -19,14 +19,14 @@ import translators as ts
 
 
 @plugins.register(
-    name="klingplayer",
+    name="lumaplayer",
     desire_priority=2,
     desc="A plugin to call klingAI API",
     version="0.0.2",
     author="davexxx",
 )
 
-class klingplayer(Plugin):
+class lumaplayer(Plugin):
     def __init__(self):
         super().__init__()
         try:
