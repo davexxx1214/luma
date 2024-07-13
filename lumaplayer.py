@@ -92,7 +92,6 @@ class lumaplayer(Plugin):
             elif content.startswith(self.kling_text_prefix):
                 pattern = self.kling_text_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
-                tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_text_prefix} + 对视频的描述\n例如：{self.kling_text_prefix} a girl is walking in the street."
 
                 if match: ##   匹配上了kling的指令
                     text_prompt = content[len(self.kling_text_prefix):].strip()
@@ -100,10 +99,10 @@ class lumaplayer(Plugin):
                     self.call_kling_service(None, user_id, e_context)
                 else:
                     tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_text_prefix} + 对视频的描述\n例如：{self.kling_text_prefix} a girl is walking in the street."
-
-                reply = Reply(type=ReplyType.TEXT, content= tip)
-                e_context["reply"] = reply
-                e_context.action = EventAction.BREAK_PASS
+                    reply = Reply(type=ReplyType.TEXT, content= tip)
+                    e_context["reply"] = reply
+                    e_context.action = EventAction.BREAK_PASS
+                
 
         elif context.type == ContextType.IMAGE:
             if self.params_cache[user_id]['kling_img_quota'] < 1:
