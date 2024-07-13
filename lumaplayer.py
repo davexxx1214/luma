@@ -134,7 +134,7 @@ class lumaplayer(Plugin):
         self.send_reply(tip, e_context)
 
         try:
-            v = VideoGen('cookie')  # Replace 'cookie', image_url with your own
+            v = VideoGen(self.cookie)  # Replace 'cookie', image_url with your own
             v.save_video(img_prompt, output_dir, image_path)
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
