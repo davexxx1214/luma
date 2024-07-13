@@ -11,7 +11,7 @@ from common.expired_dict import ExpiredDict
 
 
 import os
-from luma import VideoGen
+from kling import ImageGen, VideoGen
 import os
 import uuid
 from glob import glob
@@ -19,14 +19,14 @@ import translators as ts
 
 
 @plugins.register(
-    name="lumaplayer",
+    name="klingplayer",
     desire_priority=2,
-    desc="A plugin to call lumaAI API",
-    version="0.0.1",
+    desc="A plugin to call klingAI API",
+    version="0.0.2",
     author="davexxx",
 )
 
-class lumaplayer(Plugin):
+class klingplayer(Plugin):
     def __init__(self):
         super().__init__()
         try:
@@ -46,14 +46,15 @@ class lumaplayer(Plugin):
             self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
             # 从配置中提取所需的设置
             self.cookie = self.config.get("cookie","")
-            self.luma_prefix = self.config.get("luma_prefix", "luma")
+            self.kling_img_prefix = self.config.get("kling_img_prefix", "kling")
+            self.kling_text_prefix = self.config.get("kling_text_prefix", "kling_text")
             self.params_cache = ExpiredDict(500)
 
             # 初始化成功日志
-            logger.info("[lumaplayer] inited.")
+            logger.info("[klingplayer] inited.")
         except Exception as e:
             # 初始化失败日志
-            logger.warn(f"lumaplayer init failed: {e}")
+            logger.warn(f"klingplayer init failed: {e}")
 
     def on_handle_context(self, e_context: EventContext):
         context = e_context["context"]
@@ -66,31 +67,31 @@ class lumaplayer(Plugin):
         # 将用户信息存储在params_cache中
         if user_id not in self.params_cache:
             self.params_cache[user_id] = {}
-            self.params_cache[user_id]['luma_quota'] = 0
-            self.params_cache[user_id]['prompt'] = None
+            self.params_cache[user_id]['kling_img_quota'] = 0
+            self.params_cache[user_id]['img_prompt'] = None
 
             logger.debug('Added new user to params_cache. user id = ' + user_id)
 
         if e_context['context'].type == ContextType.TEXT:
-            if content.startswith(self.luma_prefix):
-                pattern = self.luma_prefix + r"\s(.+)"
+            if content.startswith(self.kling_img_prefix):
+                pattern = self.kling_img_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
-                if match: ##   匹配上了luma的指令
-                    query = content[len(self.luma_prefix):].strip()
+                if match: ##   匹配上了kling的指令
+                    query = content[len(self.kling_img_prefix):].strip()
                     prompt = self.translate_to_english(query)
-                    logger.info(f"translate luma prompt to : {prompt}")
-                    self.params_cache[user_id]['prompt'] = prompt
-                    self.params_cache[user_id]['luma_quota'] = 1
-                    tip = f"💡已经开启图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{prompt}"
+                    logger.info(f"translate kling prompt to : {prompt}")
+                    self.params_cache[user_id]['img_prompt'] = prompt
+                    self.params_cache[user_id]['kling_img_quota'] = 1
+                    tip = f"💡已经开启kling图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{prompt}"
                 else:
-                    tip = f"💡欢迎使用图片生成视频服务，指令格式为:\n\n{self.luma_prefix} + 对视频的描述(英文更佳)\n例如：{self.luma_prefix}  a cute cat is dancing"
+                    tip = f"💡欢迎使用kling图片生成视频服务，指令格式为:\n\n{self.kling_img_prefix} + 对视频的描述\n例如：{self.kling_img_prefix} make the picture alive."
 
                 reply = Reply(type=ReplyType.TEXT, content= tip)
                 e_context["reply"] = reply
                 e_context.action = EventAction.BREAK_PASS
 
         elif context.type == ContextType.IMAGE:
-            if self.params_cache[user_id]['luma_quota'] < 1:
+            if self.params_cache[user_id]['kling_img_quota'] < 1:
                 # 进行下一步的操作                
                 logger.debug("on_handle_context: 当前用户生成视频配额不够，不进行识别")
                 return
@@ -100,9 +101,9 @@ class lumaplayer(Plugin):
             image_path = context.content
             logger.info(f"on_handle_context: 获取到图片路径 {image_path}")
 
-            if self.params_cache[user_id]['luma_quota'] > 0:
-                self.params_cache[user_id]['luma_quota'] = 0
-                self.call_luma_service(image_path, user_id, e_context)
+            if self.params_cache[user_id]['kling_img_quota'] > 0:
+                self.params_cache[user_id]['kling_img_quota'] = 0
+                self.call_kling_service(image_path, user_id, e_context)
 
             # 删除文件
             os.remove(image_path)
@@ -122,31 +123,10 @@ class lumaplayer(Plugin):
         """Check if the file exists and is greater than a given minimum size in bytes."""
         return os.path.exists(file_path) and os.path.getsize(file_path) > min_size
 
-    def call_luma_service(self, image_path, user_id, e_context):
-        logger.info(f"call_luma_service")
+    def call_kling_service(self, image_path, user_id, e_context):
+        logger.info(f"call_kling_service")
 
-        prompt = self.params_cache[user_id]['prompt']
-        try:
-            i = VideoGen(self.cookie, image_path ) # Replace 'cookie', image_url with your own
-        except Exception as e:
-                    logger.error("call luma api error: {}".format(e))
-                    rt = ReplyType.TEXT
-                    rc = f"服务不可用，请联系管理员: {e}"
-                    reply = Reply(rt, rc)
-                    e_context["reply"] = reply
-                    e_context.action = EventAction.BREAK_PASS
-                    return        
-
-        logger.info(f"credit left =  {i.get_limit_left()} ")
-        if i.get_limit_left() < 1:
-            logger.info("No enough credit left.")
-            rt = ReplyType.TEXT
-            rc = "账户额度不够，请联系管理员"
-            reply = Reply(rt, rc)
-            e_context["reply"] = reply
-            e_context.action = EventAction.BREAK_PASS
-            return
-        
+        img_prompt = self.params_cache[user_id]['img_prompt'] 
         output_dir = self.generate_unique_output_directory(TmpDir().path())
         logger.info(f"output dir = {output_dir}")
 
@@ -154,9 +134,10 @@ class lumaplayer(Plugin):
         self.send_reply(tip, e_context)
 
         try:
-            i.save_video(prompt, output_dir)
+            v = VideoGen('cookie')  # Replace 'cookie', image_url with your own
+            v.save_video(img_prompt, output_dir, image_path)
         except Exception as e:
-            logger.error("call luma api error: {}".format(e))
+            logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
             rc = f"服务暂不可用: {e}"
             reply = Reply(rt, rc)
@@ -169,7 +150,7 @@ class lumaplayer(Plugin):
         for file_path in mp4_files:
             if self.is_valid_file(file_path):
                 logger.info(f"File {file_path} is valid.")
-                newfilepath = self.rename_file(file_path, prompt)
+                newfilepath = self.rename_file(file_path, img_prompt)
                 rt = ReplyType.VIDEO
                 rc = newfilepath
                 self.send_reply(rc, e_context, rt)

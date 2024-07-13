@@ -1,1 +1,1 @@
-from .lumaplayer import *
+from .klingplayer import *
