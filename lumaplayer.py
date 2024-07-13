@@ -92,6 +92,8 @@ class lumaplayer(Plugin):
             elif content.startswith(self.kling_text_prefix):
                 pattern = self.kling_text_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
+                tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_text_prefix} + 对视频的描述\n例如：{self.kling_text_prefix} a girl is walking in the street."
+
                 if match: ##   匹配上了kling的指令
                     text_prompt = content[len(self.kling_text_prefix):].strip()
                     self.params_cache[user_id]['text_prompt'] = text_prompt
