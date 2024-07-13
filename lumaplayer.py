@@ -171,7 +171,7 @@ class lumaplayer(Plugin):
         for file_path in mp4_files:
             if self.is_valid_file(file_path):
                 logger.info(f"File {file_path} is valid.")
-                newfilepath = self.rename_file(file_path, img_prompt)
+                newfilepath = self.rename_file(file_path, prompt)
                 rt = ReplyType.VIDEO
                 rc = newfilepath
                 self.send_reply(rc, e_context, rt)
