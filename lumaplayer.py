@@ -160,7 +160,7 @@ class lumaplayer(Plugin):
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
-            rc = f"服务暂不可用: {e}"
+            rc = f"服务暂不可用,可能是没有通过内容审核，错误信息: {e}"
             reply = Reply(rt, rc)
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
