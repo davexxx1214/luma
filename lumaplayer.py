@@ -47,7 +47,11 @@ class lumaplayer(Plugin):
             # 从配置中提取所需的设置
             self.cookie = self.config.get("cookie","")
             self.kling_img_prefix = self.config.get("kling_img_prefix", "kling")
+            self.kling_hd_img_prefix = self.config.get("kling_hd_img_prefix", "kling")
+
             self.kling_text_prefix = self.config.get("kling_text_prefix", "kling_text")
+            self.kling_hd_text_prefix = self.config.get("kling_hd_text_prefix", "kling_hd_text")
+
             self.params_cache = ExpiredDict(500)
 
             # 初始化成功日志
@@ -58,7 +62,7 @@ class lumaplayer(Plugin):
 
     def on_handle_context(self, e_context: EventContext):
         context = e_context["context"]
-        if context.type not in [ContextType.TEXT, ContextType.SHARING,ContextType.FILE,ContextType.IMAGE]:
+        if context.type not in [ContextType.TEXT, ContextType.SHARING, ContextType.FILE, ContextType.IMAGE]:
             return
         msg: ChatMessage = e_context["context"]["msg"]
         user_id = msg.from_user_id
@@ -68,8 +72,13 @@ class lumaplayer(Plugin):
         if user_id not in self.params_cache:
             self.params_cache[user_id] = {}
             self.params_cache[user_id]['kling_img_quota'] = 0
+            self.params_cache[user_id]['kling_hd_img_quota'] = 0
+
             self.params_cache[user_id]['img_prompt'] = None
+            self.params_cache[user_id]['hd_img_prompt'] = None
+
             self.params_cache[user_id]['text_prompt'] = None
+            self.params_cache[user_id]['hd_text_prompt'] = None
 
             logger.debug('Added new user to params_cache. user id = ' + user_id)
 
@@ -77,7 +86,7 @@ class lumaplayer(Plugin):
             if content.startswith(self.kling_img_prefix):
                 pattern = self.kling_img_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
-                if match: ##   匹配上了kling的指令
+                if match:  # 匹配上了kling的指令
                     img_prompt = content[len(self.kling_img_prefix):].strip()
                     self.params_cache[user_id]['img_prompt'] = img_prompt
                     self.params_cache[user_id]['kling_img_quota'] = 1
@@ -85,27 +94,53 @@ class lumaplayer(Plugin):
                 else:
                     tip = f"💡欢迎使用kling图片生成视频服务，指令格式为:\n\n{self.kling_img_prefix} + 对视频的描述\n例如：{self.kling_img_prefix} make the picture alive."
 
-                reply = Reply(type=ReplyType.TEXT, content= tip)
+                reply = Reply(type=ReplyType.TEXT, content=tip)
+                e_context["reply"] = reply
+                e_context.action = EventAction.BREAK_PASS
+
+            elif content.startswith(self.kling_hd_img_prefix):
+                pattern = self.kling_hd_img_prefix + r"\s(.+)"
+                match = re.match(pattern, content)
+                if match:  # 匹配上了kling高清图的指令
+                    hd_img_prompt = content[len(self.kling_hd_img_prefix):].strip()
+                    self.params_cache[user_id]['hd_img_prompt'] = hd_img_prompt
+                    self.params_cache[user_id]['kling_hd_img_quota'] = 1
+                    tip = f"💡已经开启kling高清图片生成视频服务，请再发送一张图片进行处理，当前的提示词为:\n{hd_img_prompt}"
+                else:
+                    tip = f"💡欢迎使用kling高清图片生成视频服务，指令格式为:\n\n{self.kling_hd_img_prefix} + 对高清視頻的描述\n例如：{self.kling_hd_img_prefix} make the picture alive in HD."
+
+                reply = Reply(type=ReplyType.TEXT, content=tip)
                 e_context["reply"] = reply
                 e_context.action = EventAction.BREAK_PASS
 
             elif content.startswith(self.kling_text_prefix):
                 pattern = self.kling_text_prefix + r"\s(.+)"
                 match = re.match(pattern, content)
-
-                if match: ##   匹配上了kling的指令
+                if match:  # 匹配上了kling的指令
                     text_prompt = content[len(self.kling_text_prefix):].strip()
                     self.params_cache[user_id]['text_prompt'] = text_prompt
                     self.call_kling_service(None, user_id, e_context)
                 else:
                     tip = f"💡欢迎使用kling文字生成视频服务，指令格式为:\n\n{self.kling_text_prefix} + 对视频的描述\n例如：{self.kling_text_prefix} a girl is walking in the street."
-                    reply = Reply(type=ReplyType.TEXT, content= tip)
+                    reply = Reply(type=ReplyType.TEXT, content=tip)
                     e_context["reply"] = reply
                     e_context.action = EventAction.BREAK_PASS
-                
+
+            elif content.startswith(self.kling_hd_text_prefix):
+                pattern = self.kling_hd_text_prefix + r"\s(.+)"
+                match = re.match(pattern, content)
+                if match:  # 匹配上了kling高清文字的指令
+                    hd_text_prompt = content[len(self.kling_hd_text_prefix):].strip()
+                    self.params_cache[user_id]['hd_text_prompt'] = hd_text_prompt
+                    self.call_kling_service(None, user_id, e_context, is_high_quality=True)
+                else:
+                    tip = f"💡欢迎使用kling高清文字生成视频服务，指令格式为:\n\n{self.kling_hd_text_prefix} + 对高清视频的描述\n例如：{self.kling_hd_text_prefix} a girl is walking in the street in HD."
+                    reply = Reply(type=ReplyType.TEXT, content=tip)
+                    e_context["reply"] = reply
+                    e_context.action = EventAction.BREAK_PASS
 
         elif context.type == ContextType.IMAGE:
-            if self.params_cache[user_id]['kling_img_quota'] < 1:
+            if self.params_cache[user_id]['kling_img_quota'] < 1 and self.params_cache[user_id]['kling_hd_img_quota'] < 1:
                 # 进行下一步的操作                
                 logger.debug("on_handle_context: 当前用户生成视频配额不够，不进行识别")
                 return
@@ -118,6 +153,10 @@ class lumaplayer(Plugin):
             if self.params_cache[user_id]['kling_img_quota'] > 0:
                 self.params_cache[user_id]['kling_img_quota'] = 0
                 self.call_kling_service(image_path, user_id, e_context)
+
+            elif self.params_cache[user_id]['kling_hd_img_quota'] > 0:
+                self.params_cache[user_id]['kling_hd_img_quota'] = 0
+                self.call_kling_service(image_path, user_id, e_context, is_high_quality=True)
 
             # 删除文件
             os.remove(image_path)
@@ -137,13 +176,12 @@ class lumaplayer(Plugin):
         """Check if the file exists and is greater than a given minimum size in bytes."""
         return os.path.exists(file_path) and os.path.getsize(file_path) > min_size
 
-    def call_kling_service(self, image_path, user_id, e_context):
+    def call_kling_service(self, image_path, user_id, e_context, is_high_quality=False):
         logger.info("call_kling_service")
-
         if image_path:
-            prompt = self.params_cache[user_id]['img_prompt']
+            prompt = self.params_cache[user_id]['img_prompt'] if not is_high_quality else self.params_cache[user_id]['hd_img_prompt']
         else:
-            prompt = self.params_cache[user_id]['text_prompt']
+            prompt = self.params_cache[user_id]['text_prompt'] if not is_high_quality else self.params_cache[user_id]['hd_text_prompt']
 
         output_dir = self.generate_unique_output_directory(TmpDir().path())
         logger.info(f"output dir = {output_dir}")
@@ -153,10 +191,7 @@ class lumaplayer(Plugin):
 
         try:
             v = VideoGen(self.cookie)  # Replace 'cookie', image_url with your own
-            if not image_path:
-                v.save_video(prompt, output_dir)
-            else:
-                v.save_video(prompt, output_dir, image_path)
+            v.save_video(prompt, output_dir, is_high_quality=is_high_quality)
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
@@ -166,7 +201,6 @@ class lumaplayer(Plugin):
             e_context.action = EventAction.BREAK_PASS
             return
 
-        
         # 查找 output_dir 中的 mp3 和 mp4 文件
         mp4_files = glob(os.path.join(output_dir, '*.mp4'))
         for file_path in mp4_files:
