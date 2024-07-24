@@ -191,7 +191,10 @@ class lumaplayer(Plugin):
 
         try:
             v = VideoGen(self.cookie)  # Replace 'cookie', image_url with your own
-            v.save_video(prompt, output_dir, is_high_quality=is_high_quality)
+            if not image_path:
+                v.save_video(prompt, output_dir,is_high_quality=is_high_quality)
+            else:
+                v.save_video(prompt, output_dir, image_path,is_high_quality=is_high_quality)
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
