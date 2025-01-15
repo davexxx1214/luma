@@ -8,8 +8,9 @@ from plugins import *
 from common.log import logger
 from common.tmp_dir import TmpDir
 from common.expired_dict import ExpiredDict
-
-
+import asyncio  # 新增导入
+import fal_client  # 新增导入
+import requests 
 import os
 from kling import VideoGen
 import os
@@ -51,7 +52,8 @@ class lumaplayer(Plugin):
 
             self.kling_text_prefix = self.config.get("kling_text_prefix", "kling_text")
             self.kling_hd_text_prefix = self.config.get("kling_hd_text_prefix", "kling_hd_text")
-
+            self.fal_api_key = self.config.get("fal_api_key", "")
+            self.fal_prefix = self.config.get("fal_prefix", "/tp")
             self.params_cache = ExpiredDict(500)
 
             # 初始化成功日志
@@ -139,6 +141,19 @@ class lumaplayer(Plugin):
                     e_context["reply"] = reply
                     e_context.action = EventAction.BREAK_PASS
 
+            elif content.startswith(self.fal_prefix):
+                pattern = self.fal_prefix + r"\s(.+)"
+                match = re.match(pattern, content)
+                if match:
+                    prompt = match.group(1).strip()
+                    asyncio.run(self.call_transpixar_service(prompt, e_context))
+                    e_context.action = EventAction.BREAK_PASS
+                else:
+                    tip = f"💡欢迎使用transpixar文字生成RGB视频服务，指令格式为:\n\n{self.fal_prefix} + 对视频的描述\n例如：{self.fal_prefix} a cloud of dust erupting."
+                    reply = Reply(ReplyType.TEXT, tip)
+                    e_context["reply"] = reply
+                    e_context.action = EventAction.BREAK_PASS
+
         elif context.type == ContextType.IMAGE:
             if self.params_cache[user_id]['kling_img_quota'] < 1 and self.params_cache[user_id]['kling_hd_img_quota'] < 1:
                 # 进行下一步的操作                
@@ -198,7 +213,7 @@ class lumaplayer(Plugin):
         except Exception as e:
             logger.error("call kling api error: {}".format(e))
             rt = ReplyType.TEXT
-            rc = f"服务暂不可用,可能是没有通过内容审核，错误信息: {e}"
+            rc = f"服务暂不可用,错误信息: {e}"
             reply = Reply(rt, rc)
             e_context["reply"] = reply
             e_context.action = EventAction.BREAK_PASS
@@ -221,6 +236,51 @@ class lumaplayer(Plugin):
                 break  # 如果某个文件无效，则跳出循环
 
         e_context.action = EventAction.BREAK_PASS
+
+    async def call_transpixar_service(self, prompt: str, e_context: EventContext):
+        try:
+            # 设置环境变量
+            os.environ["FAL_KEY"] = self.fal_api_key
+            
+            tip = '欢迎使用transpixar视频生成服务！🎥✨ 让AI为您创作独特的视频效果。请稍等片刻，马上为您生成...'
+            self.send_reply(tip, e_context)
+
+            handler = await fal_client.submit_async(
+                "fal-ai/transpixar",
+                arguments={
+                    "prompt": prompt
+                },
+            )
+
+            result = await handler.get()
+            
+            if 'videos' in result:
+                output_dir = self.generate_unique_output_directory(TmpDir().path())
+
+                for video in result['videos']:
+                    video_url = video['url']
+                    file_type = "rgb" if video['file_name'] == 'rgb.mp4' else "alpha.mp4"
+                    
+                    # 构建视频文件路径
+                    video_path = os.path.join(output_dir, f"tp_{file_type}_{uuid.uuid4()}.mp4")
+                    
+                    # 下载视频
+                    response = requests.get(video_url)
+                    with open(video_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # 重命名并发送视频
+                    newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
+                    self.send_reply(newfilepath, e_context, ReplyType.VIDEO)
+                    
+                    # 添加简短延迟，避免消息发送太快
+                    await asyncio.sleep(1)
+            else:
+                self.send_reply("视频生成失败，请稍后重试", e_context)
+                
+        except Exception as e:
+            logger.error(f"transpixar service error: {e}")
+            self.send_reply(f"服务暂不可用，错误信息: {e}", e_context)
         
     def send_reply(self, reply, e_context: EventContext, reply_type=ReplyType.TEXT):
         if isinstance(reply, Reply):
