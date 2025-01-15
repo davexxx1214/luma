@@ -240,23 +240,25 @@ class lumaplayer(Plugin):
 
     def call_transpixar_service(self, prompt: str, e_context: EventContext):
         try:
-            # 设置环境变量
-            os.environ["FAL_KEY"] = self.fal_api_key
+            # 设置 API 密钥
+            api_key = self.fal_api_key
             
             tip = '欢迎使用transpixar视频生成服务！🎥✨ 让AI为您创作独特的视频效果。请稍等片刻，马上为您生成...'
             self.send_reply(tip, e_context)
 
-            async def run_fal():
-                handler = await fal_client.submit_async(
-                    "fal-ai/transpixar",
-                    arguments={
-                        "prompt": prompt
-                    },
-                )
-                return await handler.get()
+            # 使用 REST API 发送请求
+            url = "https://fal.run/fal-ai/transpixar"
+            headers = {
+                "Authorization": f"Key {api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "prompt": prompt
+            }
 
-            # 使用 asyncio.run 来处理完整的异步操作
-            result = asyncio.run(run_fal())
+            # 发送同步请求
+            response = requests.post(url, headers=headers, json=data)
+            result = response.json()
             
             if 'videos' in result:
                 output_dir = self.generate_unique_output_directory(TmpDir().path())
@@ -269,9 +271,9 @@ class lumaplayer(Plugin):
                     video_path = os.path.join(output_dir, f"tp_{file_type}_{uuid.uuid4()}.mp4")
                     
                     # 下载视频
-                    response = requests.get(video_url)
+                    video_response = requests.get(video_url)
                     with open(video_path, 'wb') as f:
-                        f.write(response.content)
+                        f.write(video_response.content)
                     
                     # 重命名并发送视频
                     newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
