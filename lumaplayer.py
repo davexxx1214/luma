@@ -250,8 +250,8 @@ class lumaplayer(Plugin):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
-            # 在新的事件循环中运行异步操作
             try:
+                # 在新的事件循环中运行异步操作
                 handler = loop.run_until_complete(
                     fal_client.submit_async(
                         "fal-ai/transpixar",
@@ -261,36 +261,37 @@ class lumaplayer(Plugin):
                     )
                 )
                 result = loop.run_until_complete(handler.get())
+                
+                if 'videos' in result:
+                    output_dir = self.generate_unique_output_directory(TmpDir().path())
+
+                    for video in result['videos']:
+                        video_url = video['url']
+                        file_type = "rgb" if video['file_name'] == 'rgb.mp4' else "alpha"
+                        
+                        # 构建视频文件路径
+                        video_path = os.path.join(output_dir, f"tp_{file_type}_{uuid.uuid4()}.mp4")
+                        
+                        # 下载视频
+                        response = requests.get(video_url)
+                        with open(video_path, 'wb') as f:
+                            f.write(response.content)
+                        
+                        # 重命名并发送视频
+                        newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
+                        self.send_reply(newfilepath, e_context, ReplyType.VIDEO)
+                    
+                    # 发送完成提示
+                    rt = ReplyType.TEXT
+                    rc = "transpixar特效视频生成完毕。"
+                    reply = Reply(rt, rc)
+                    e_context["reply"] = reply
+                    e_context.action = EventAction.BREAK_PASS
+                else:
+                    self.send_reply("视频生成失败，请稍后重试", e_context)
+                    
             finally:
                 loop.close()
-            
-            if 'videos' in result:
-                output_dir = self.generate_unique_output_directory(TmpDir().path())
-
-                for video in result['videos']:
-                    video_url = video['url']
-                    file_type = "rgb" if video['file_name'] == 'rgb.mp4' else "alpha"
-                    
-                    # 构建视频文件路径
-                    video_path = os.path.join(output_dir, f"tp_{file_type}_{uuid.uuid4()}.mp4")
-                    
-                    # 下载视频
-                    response = requests.get(video_url)
-                    with open(video_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    # 重命名并发送视频
-                    newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
-                    self.send_reply(newfilepath, e_context, ReplyType.VIDEO)
-                    
-                rt = ReplyType.TEXT
-                rc = "transpixar特效视频生成完毕。"
-                reply = Reply(rt, rc)
-                e_context["reply"] = reply
-                e_context.action = EventAction.BREAK_PASS
-
-            else:
-                self.send_reply("视频生成失败，请稍后重试", e_context)
                 
         except Exception as e:
             logger.error(f"transpixar service error: {e}")
