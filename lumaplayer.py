@@ -273,8 +273,12 @@ class lumaplayer(Plugin):
                     newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
                     self.send_reply(newfilepath, e_context, ReplyType.VIDEO)
                     
-                    # 添加简短延迟，避免消息发送太快
-                    await asyncio.sleep(1)
+                rt = ReplyType.TEXT
+                rc = "transpixar特效视频生成完毕。"
+                reply = Reply(rt, rc)
+                e_context["reply"] = reply
+                e_context.action = EventAction.BREAK_PASS
+
             else:
                 self.send_reply("视频生成失败，请稍后重试", e_context)
                 
