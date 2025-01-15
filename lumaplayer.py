@@ -146,7 +146,8 @@ class lumaplayer(Plugin):
                 match = re.match(pattern, content)
                 if match:
                     prompt = match.group(1).strip()
-                    asyncio.run(self.call_transpixar_service(prompt, e_context))
+                     # 改用同步方式调用
+                    self.call_transpixar_service(prompt, e_context)
                     e_context.action = EventAction.BREAK_PASS
                 else:
                     tip = f"💡欢迎使用transpixar文字生成RGB视频服务，指令格式为:\n\n{self.fal_prefix} + 对视频的描述\n例如：{self.fal_prefix} a cloud of dust erupting."
@@ -237,7 +238,7 @@ class lumaplayer(Plugin):
 
         e_context.action = EventAction.BREAK_PASS
 
-    async def call_transpixar_service(self, prompt: str, e_context: EventContext):
+    def call_transpixar_service(self, prompt: str, e_context: EventContext):
         try:
             # 设置环境变量
             os.environ["FAL_KEY"] = self.fal_api_key
@@ -245,21 +246,30 @@ class lumaplayer(Plugin):
             tip = '欢迎使用transpixar视频生成服务！🎥✨ 让AI为您创作独特的视频效果。请稍等片刻，马上为您生成...'
             self.send_reply(tip, e_context)
 
-            handler = await fal_client.submit_async(
-                "fal-ai/transpixar",
-                arguments={
-                    "prompt": prompt
-                },
-            )
-
-            result = await handler.get()
+            # 创建新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # 在新的事件循环中运行异步操作
+            try:
+                handler = loop.run_until_complete(
+                    fal_client.submit_async(
+                        "fal-ai/transpixar",
+                        arguments={
+                            "prompt": prompt
+                        },
+                    )
+                )
+                result = loop.run_until_complete(handler.get())
+            finally:
+                loop.close()
             
             if 'videos' in result:
                 output_dir = self.generate_unique_output_directory(TmpDir().path())
 
                 for video in result['videos']:
                     video_url = video['url']
-                    file_type = "rgb" if video['file_name'] == 'rgb.mp4' else "alpha.mp4"
+                    file_type = "rgb" if video['file_name'] == 'rgb.mp4' else "alpha"
                     
                     # 构建视频文件路径
                     video_path = os.path.join(output_dir, f"tp_{file_type}_{uuid.uuid4()}.mp4")
