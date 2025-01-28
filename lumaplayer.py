@@ -180,7 +180,7 @@ class lumaplayer(Plugin):
     
     def translate_to_english(self, text):
         logger.info(f"translate text = {text}")
-        return ts.translate_text(text, translator='google')
+        return ts.translate_text(text, translator='alibaba')
     
     def generate_unique_output_directory(self, base_dir):
         """Generate a unique output directory using a UUID."""
