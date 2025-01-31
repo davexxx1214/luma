@@ -226,7 +226,7 @@ class lumaplayer(Plugin):
             if self.is_valid_file(file_path):
                 logger.info(f"File {file_path} is valid.")
                 newfilepath = self.rename_file(file_path, prompt)
-                rt = ReplyType.VIDEO
+                rt = ReplyType.FILE
                 rc = newfilepath
                 self.send_reply(rc, e_context, rt)
             else:
@@ -277,7 +277,7 @@ class lumaplayer(Plugin):
                     
                     # 重命名并发送视频
                     newfilepath = self.rename_file(video_path, f"{prompt}_{file_type}")
-                    self.send_reply(newfilepath, e_context, ReplyType.VIDEO)
+                    self.send_reply(newfilepath, e_context, ReplyType.FILE)
                 
                 # 发送完成提示
                 rt = ReplyType.TEXT
